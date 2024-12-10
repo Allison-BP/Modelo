@@ -48,6 +48,23 @@ def generate_sample_data():
         )
         db.session.add(patient)
     db.session.commit()
+    
+# Clases
+
+@app.route('/patients', methods=['GET'])
+def get_patients():
+    patients = Patient.query.all()
+    schema = PatientSchema(many=True)  
+    return schema.jsonify(patients)
+
+# Ruta para Obtener un Paciente por ID
+
+@app.route('/patients/<int:id>', methods=['GET'])
+def get_patient(id):
+    patient = Patient.query.get_or_404(id)
+    schema = PatientSchema()  # Serializar un solo registro
+    return schema.jsonify(patient)
+
 
 if __name__ == '__main__':
     # Envolver en un contexto de aplicación
