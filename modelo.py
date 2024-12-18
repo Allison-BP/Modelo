@@ -8,9 +8,15 @@ from mysql.connector import Error
 _ = load_dotenv(find_dotenv())
 
 # Asigna la clave API desde las variables de entorno
-openai.api_key  = os.environ['OPENAI_API_KEY']
+openai.api_key = os.environ['OPENAI_API_KEY']
 
-# Conexión base de datso
+# Moderación en la API
+def moderate_content(text):
+    moderation_response = openai.Moderation.create(input=text)
+    flagged = moderation_response["results"][0]["flagged"]
+    return flagged
+
+# Conexión base de datos
 def connect_to_db():
     try:
         connection = mysql.connector.connect(
@@ -26,7 +32,6 @@ def connect_to_db():
         return None
 
 # Consulta información del paciente y su historial clínico
-
 def query_patient_history(tipo_documento, numero_documento):
     connection = connect_to_db()
     if not connection:
@@ -62,27 +67,20 @@ def query_patient_history(tipo_documento, numero_documento):
     except Error as e:
         return f"Error al realizar la consulta: {e}", None
 
-   
+# Obtener respuesta del modelo
 def get_completion_from_messages(messages, 
                                  model="gpt-3.5-turbo", 
                                  temperature=0, 
-                                 max_tokens=500):
-    
-# Envía los messages a la API de OpenAI.
-# La respuesta de la API se almacena en response.
-# Devuelve solo el contenido de la respuesta (choices[0].message["content"]).
-
+                                 max_tokens=100):
     response = openai.ChatCompletion.create(
         model=model,
         messages=messages,
-        temperature=temperature, # this is the degree of randomness of the model's output
-        max_tokens=max_tokens, # the maximum number of tokens the model can ouptut 
+        temperature=temperature,
+        max_tokens=max_tokens,
     )
     return response.choices[0].message["content"]
 
-# 3. Definición del mensaje del sistema
-
-# delimiter = "####"
+# Definición del mensaje del sistema
 system_message = """
 Eres un asistente inteligente especializado en medicina y bases de datos.
 Proporcionas respuestas sobre los datos almacenados en el sistema hospitalario y ofreces información clara y precisa sobre temas médicos, 
@@ -92,19 +90,14 @@ Siempre aclaras que tu consejo no sustituye la opinión de un médico profesiona
 Solo ofreces orientación y educación médica de forma responsable.
 """
 
-# user_message = "¿Qué puedo hacer para aliviar el dolor de cabeza sin medicamentos?"
+# Función para validar la entrada del usuario (prevención de inyección de prompts)
+def validate_user_input(user_message):
+    forbidden_patterns = ["{", "}", "[", "]", "<", ">", ";", "/*", "*/", ":", "=", "(", ")"]
+    for pattern in forbidden_patterns:
+        if pattern in user_message.lower():
+            return False  # Si encuentra un patrón prohibido, retorna False
+    return True  # Si el mensaje es seguro, retorna True
 
-# # Creación de la lista de mensajes
-# messages = [
-#     {'role': 'system', 'content': system_message},
-#     {'role': 'user', 'content': user_message}
-# ]
-
-# # Obtener la respuesta del modelo
-# response = get_completion_from_messages(messages)
-
-# # Imprimir la respuesta clasificada
-# print(response)
 
 while True:
     user_status = input("¿Eres un usuario registrado? Escribe 1 para Sí, 2 para No (o 'salir' para terminar): ")
@@ -114,18 +107,18 @@ while True:
     
     if user_status == '1':
         # Solicitar tipo y número de documento
-        tipo_documento = input("Escribe el tipo de documento (CC, TI, etc.): ")
-        numero_documento = input("Escribe el número de documento: ")
+        tipo_documento = input("Escribe el tipo de documento (CC, TI, CE): ")
+        numero_documento = int(input("Escribe el número de documento: "))
 
         # Consultar información del paciente
         patient_info, history = query_patient_history(tipo_documento, numero_documento)
-
         if isinstance(patient_info, str):
             print("\nResultado:")
             print(patient_info)
             continue
 
         print("\n¡Información validada! Ahora puedes realizar consultas.")
+        
         while True:
             user_message = input("Escribe tu consulta o 'volver' para regresar al menú principal: ")
             if user_message.lower() == 'volver':
@@ -144,6 +137,9 @@ while True:
             ]
 
             response = get_completion_from_messages(messages)
+            if moderate_content(response):
+                print("La respuesta generada contiene contenido inapropiado. Intenta una consulta diferente.")
+                continue
 
             print("\nAsistente:")
             print(response)
@@ -154,6 +150,10 @@ while True:
             user_message = input("Escribe tu consulta o 'volver' para regresar al menú principal: ")
             if user_message.lower() == 'volver':
                 break
+            
+            if moderate_content(user_message):
+                print("Tu consulta contiene lenguaje inapropiado. Por favor, modifícala.")
+                continue
 
             # Consultas generales
             messages = [
