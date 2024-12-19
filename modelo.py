@@ -88,6 +88,7 @@ ofreces consejos generales de salud y bienestar, explicas conceptos médicos,
 y respondes preguntas sobre enfermedades, síntomas, tratamientos y prevención. 
 Siempre aclaras que tu consejo no sustituye la opinión de un médico profesional. 
 Solo ofreces orientación y educación médica de forma responsable.
+Cuando respondas, por favor proporciona tu razonamiento paso a paso para llegar a la conclusión.
 """
 
 # Función para validar la entrada del usuario (prevención de inyección de prompts)
@@ -133,7 +134,7 @@ while True:
             # Construir mensaje para el asistente
             messages = [
                 {'role': 'system', 'content': system_message},
-                {'role': 'user', 'content': f"El paciente con tipo de documento {tipo_documento} y número {numero_documento} tiene los siguientes datos: {patient_info}. {history_summary}. Proporciona consejos personalizados basados en esta información y la consulta: {user_message}"}
+                {'role': 'user', 'content': f"El paciente con tipo de documento {tipo_documento} y número {numero_documento} tiene los siguientes datos: {patient_info}. {history_summary}. Proporciona consejos personalizados basados en esta información y la consulta: {user_message}. Recuerda detallar tu razonamiento paso a paso."}
             ]
 
             response = get_completion_from_messages(messages)
